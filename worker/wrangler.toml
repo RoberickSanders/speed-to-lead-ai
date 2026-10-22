@@ -1,0 +1,21 @@
+name = "speed-to-lead-demo"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "speed-to-lead-demo"
+database_id = "<YOUR_D1_DATABASE_ID>"
+
+[vars]
+AI_ENABLED = "true"      # kill switch: "false" disables all AI calls (template reply, everything to a human)
+MAX_ROWS = "200"         # stored rows cap
+RATE_PER_HOUR = "8"      # submissions per IP per hour
+GLOBAL_PER_DAY = "300"   # submissions across all visitors per day
+CLASSIFIER_API_URL = "https://classifier.example.com/v1/classify"
+CLASSIFIER_MODEL = "your-classifier-model"
+# Secret (set with `npx wrangler secret put CLASSIFIER_API_KEY`), never in this file.

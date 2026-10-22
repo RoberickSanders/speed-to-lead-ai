@@ -1,0 +1,489 @@
+{
+ "name": "Speed-to-lead sorter (example)",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "speed-to-lead",
+    "responseMode": "lastNode",
+    "options": {}
+   },
+   "name": "Inbound Webhook",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    0,
+    300
+   ],
+   "webhookId": "speed-to-lead-demo"
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.CLASSIFIER_API_URL }}",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $env.CLASSIFIER_API_KEY }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({model:$env.CLASSIFIER_MODEL, state:{channel:$json.body.channel||'sms', message:$json.body.message}, questions:{\"intent\": {\"type\": \"choice\", \"instructions\": \"What does this inbound med spa message (web form, SMS reply, or missed-call transcript) mainly want? Messages may use slang, typos, Spanish, or sarcasm.\", \"criteria\": {\"book\": \"wants to book / schedule a new appointment\", \"price_question\": \"asks about price, cost, discounts or financing\", \"reschedule\": \"wants to move, change or cancel an existing appointment\", \"complaint\": \"unhappy about a result, service, wait or billing\", \"spam\": \"unsolicited marketing, scam, or not a real customer\", \"opt_out\": \"wants to stop receiving messages / unsubscribe\"}}, \"urgency\": {\"type\": \"score\", \"instructions\": \"How urgently should the spa respond?\", \"criteria\": [\"Low: no time pressure, spam or general info\", \"Normal: routine request\", \"High: wants something soon (today/tomorrow) or is upset\", \"Critical: possible adverse reaction or medical safety issue\"]}, \"asks_for_human\": {\"type\": \"yes_no\", \"instructions\": \"Does the sender ask to talk to a real person, staff, or a call back from someone?\"}, \"opt_out_stop\": {\"type\": \"yes_no\", \"instructions\": \"Is the sender asking to stop or unsubscribe from messages, including sarcastic or Spanish phrasing (e.g. STOP, lose my number, no me manden más)?\"}, \"medical_question_needs_staff\": {\"type\": \"yes_no\", \"instructions\": \"Does the message ask a medical or safety question (pregnancy, medications, conditions, side effects, a reaction after treatment) that a licensed staff member must answer?\"}}}) }}",
+    "options": {
+     "timeout": 5000
+    }
+   },
+   "name": "Classify message",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "const a=$json.answers, i=a.intent; let route;\nif(a.opt_out_stop.p_yes>=0.5||i.choice==='opt_out') route='stop_all';\nelse if(a.medical_question_needs_staff.p_yes>=0.5) route='staff';\nelse if(i.choice==='spam'&&i.confidence>=0.5) route='spam_drop';\nelse if(i.confidence<0.5||a.asks_for_human.p_yes>=0.5||i.choice==='complaint') route='human';\nelse route={book:'booking_link',price_question:'price_reply',reschedule:'reschedule_link'}[i.choice]||'human';\nreturn [{json:{route,intent:i.choice,confidence:i.confidence,urgency:a.urgency.score,model:$json.model,usage:$json.usage,message:$('Inbound Webhook').first().json.body}}];"
+   },
+   "name": "Route (code)",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    440,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "rules": {
+     "values": [
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "stop_all",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "stop_all"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "staff",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "staff"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "spam_drop",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "spam_drop"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "human",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "human"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "booking_link",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "booking_link"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "price_reply",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "price_reply"
+      },
+      {
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "typeValidation": "strict",
+         "version": 2
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.route }}",
+          "rightValue": "reschedule_link",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          }
+         }
+        ],
+        "combinator": "and"
+       },
+       "renameOutput": true,
+       "outputKey": "reschedule_link"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "name": "Switch on route",
+   "type": "n8n-nodes-base.switch",
+   "typeVersion": 3.2,
+   "position": [
+    660,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "stop_all",
+       "name": "action",
+       "value": "stop_all",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO stop_all",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "staff",
+       "name": "action",
+       "value": "staff",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO staff",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    120
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "spam_drop",
+       "name": "action",
+       "value": "spam_drop",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO spam_drop",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    240
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "human",
+       "name": "action",
+       "value": "human",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO human",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    360
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "booking_link",
+       "name": "action",
+       "value": "booking_link",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO booking_link",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    480
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "price_reply",
+       "name": "action",
+       "value": "price_reply",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO price_reply",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    600
+   ]
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "reschedule_link",
+       "name": "action",
+       "value": "reschedule_link",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {
+     "includeOtherFields": true
+    }
+   },
+   "name": "TODO reschedule_link",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    900,
+    720
+   ]
+  }
+ ],
+ "connections": {
+  "Inbound Webhook": {
+   "main": [
+    [
+     {
+      "node": "Classify message",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Classify message": {
+   "main": [
+    [
+     {
+      "node": "Route (code)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Route (code)": {
+   "main": [
+    [
+     {
+      "node": "Switch on route",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Switch on route": {
+   "main": [
+    [
+     {
+      "node": "TODO stop_all",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO staff",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO spam_drop",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO human",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO booking_link",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO price_reply",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "TODO reschedule_link",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {},
+ "pinData": {}
+}
