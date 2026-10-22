@@ -51,9 +51,12 @@ cd worker
 npx wrangler d1 create speed-to-lead-demo          # paste the id into wrangler.toml
 npx wrangler d1 execute speed-to-lead-demo --remote --file schema.sql
 npx wrangler secret put CLASSIFIER_API_KEY
+npx wrangler secret put DASHBOARD_TOKEN       # protects /dashboard
 npx wrangler deploy
 ```
 Set `CLASSIFIER_API_URL` / `CLASSIFIER_MODEL` in `wrangler.toml`. The classifier contract is `POST {model, state, questions}` → `{answers: {q: {choice|score|p_yes, confidence}}}`; adapt `classifyLead()` for your provider.
+
+**Dashboard access:** `/dashboard` lists every stored submission, so it requires `DASHBOARD_TOKEN`, sent as the `x-dashboard-token` header or `/dashboard?token=...`. If the secret is unset the dashboard returns 401. For real use, put `/dashboard` behind [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) instead of (or as well as) the token. AI replies are post-filtered: any sentence with a link, email or phone number is dropped.
 
 **Sorter eval**
 ```bash

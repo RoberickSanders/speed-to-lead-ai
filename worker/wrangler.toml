@@ -19,3 +19,4 @@ GLOBAL_PER_DAY = "300"   # submissions across all visitors per day
 CLASSIFIER_API_URL = "https://classifier.example.com/v1/classify"
 CLASSIFIER_MODEL = "your-classifier-model"
 # Secret (set with `npx wrangler secret put CLASSIFIER_API_KEY`), never in this file.
+# Secret DASHBOARD_TOKEN (`npx wrangler secret put DASHBOARD_TOKEN`) protects /dashboard; unset = dashboard disabled.

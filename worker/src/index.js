@@ -55,7 +55,7 @@ async function classifyLead(env, day, name, message) {
   if (!env.CLASSIFIER_API_KEY) throw new Error("CLASSIFIER_API_KEY not set");
   const res = await fetch(env.CLASSIFIER_API_URL, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.CLASSIFIER_API_KEY}` },
     body: JSON.stringify({ model: env.CLASSIFIER_MODEL, state: { today: day, channel: "web_form", name, message }, questions: QUESTIONS }), signal: AbortSignal.timeout(8000) });
-  if (!res.ok) { const body = (await res.text().catch(() => "")).slice(0, 300); throw new Error(`classifier http ${res.status}: ${body}`); }
+  if (!res.ok) { throw new Error(`classifier http ${res.status}`); }
   const a = (await res.json())?.answers || {};
   if (typeof a.icp_fit?.p_yes !== "number" || typeof a.buy_intent?.p_yes !== "number") throw new Error("no score");
   const icp = r3(a.icp_fit.p_yes), intent = r3(a.buy_intent.p_yes), avg = (icp + intent) / 2;
@@ -69,9 +69,11 @@ async function classifyLead(env, day, name, message) {
 
 // Post-check: the reply must never offer specific days, dates or times. Drop any sentence that does.
 const SLOT_RE = /\b(mon|tues?|wed(nes)?|thu(rs?)?|fri|sat(ur)?|sun)(day)?s?\b|\b(we have|we've got|there is|there's|we can (usually )?(fit|accommodate|squeeze))\b|\b(availability|openings?|same-day)\b|\b(today|tonight|tomorrow|weekend)\b|\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)|\b\d{1,2}:\d{2}\b|\b\d{1,2}(st|nd|rd|th)\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}\/\d{1,2}\b|\b(morning|afternoon|evening|noon)\b/i;
+// Post-check: the reply must never contain links, emails or phone numbers (only the BOOKING placeholder). Drop any sentence that does.
+const CONTACT_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|io|co|ly|me|app|link)\b|[\w.+-]+@[\w-]+\.[\w.]+|\+?\d[\d\s().-]{6,}\d)/i;
 function cleanReply(text, name, f) {
   const parts = String(text || "").split(/(?<=[.!?])\s+/).filter(Boolean);
-  let kept = parts.filter((x) => !SLOT_RE.test(x));
+  let kept = parts.filter((x) => !SLOT_RE.test(x) && !CONTACT_RE.test(x));
   if (kept.length !== parts.length) kept = kept.filter((x) => !/\b(which|either|those|these|that time|works for you)\b.*\?$/i.test(x));
   let out = kept.join(" ").trim();
   const changed = kept.length !== parts.length;
@@ -214,12 +216,25 @@ async function dashboard(env) {
 }
 
 
+// Dashboard shows every stored submission, so it needs the DASHBOARD_TOKEN secret, sent as
+// the x-dashboard-token header or ?token= query. Unset token = dashboard disabled. Cloudflare Access is a stronger option.
+async function dashboardAllowed(req, url, env) {
+  const want = env.DASHBOARD_TOKEN;
+  if (!want) return false;
+  const got = req.headers.get("x-dashboard-token") || url.searchParams.get("token") || "";
+  const [a, b] = await Promise.all([sha(got), sha(want)]);
+  return a === b; // compare fixed-length hashes, not raw strings
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const html = (h) => new Response(h, { headers: { "content-type": "text/html;charset=utf-8", "x-robots-tag": "noindex" } });
     if (url.pathname === "/api/lead" && req.method === "POST") return handleLead(req, env);
-    if (url.pathname === "/dashboard") return html(await dashboard(env));
+    if (url.pathname === "/dashboard") {
+      if (!(await dashboardAllowed(req, url, env))) return new Response("Unauthorized", { status: 401, headers: { "x-robots-tag": "noindex" } });
+      return html(await dashboard(env));
+    }
     if (url.pathname === "/" || url.pathname === "/index.html") return html(HOME);
     return new Response("Not found", { status: 404 });
   },
