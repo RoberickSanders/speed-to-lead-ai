@@ -179,7 +179,7 @@ const page = (title, inner) => `<!doctype html><html lang="en"><head><meta chars
 const HOME = page("Example Med Spa · Speed-to-lead demo", `
 <h1>Example Med Spa</h1><p class="sub">Tell us what you're looking for. You'll see the reply our system would text you, and how fast it was ready.</p>
 <form id="f" class="card">
-<label for="name">Name</label><input id="name" name="name" required maxlength="80" placeholder="Jamie Rivera">
+<label for="name">Name</label><input id="name" name="name" required maxlength="80" placeholder="Jane Doe">
 <label for="contact">Phone or email</label><input id="contact" name="contact" required maxlength="120" placeholder="(555) 010-2030">
 <label for="message">What are you looking for?</label><textarea id="message" name="message" required maxlength="600" placeholder="Want botox before my wedding on the 14th, budget around 500"></textarea>
 <button id="b" type="submit">Send</button><p class="muted">Demo only: nothing is texted or emailed. Please don't enter real contact details.</p>
